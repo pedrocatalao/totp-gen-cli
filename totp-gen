@@ -1,0 +1,25 @@
+#!/bin/bash
+
+totp(){
+  timestamp=${2:-"$(date +%s)"}
+  hotp "${1}" "$((timestamp/30))"
+}
+
+hotp(){
+  local key_hex=$(echo -n "${1}" | base32 -d | xxd -p | xargs | tr -d ' ')
+  local counter_hex="$(printf %016x "${2}")"
+  local string=$(hmac "${key_hex}" "${counter_hex}")
+  local -i offset=$((0x${string:39:1}))
+  local truncated=${string:2*offset:8}
+  local masked=$((0x${truncated} & 0x7fffffff))
+  printf "%06d\n" $((masked % 1000000))
+}
+
+hmac(){
+  local key="${1}"
+  local data="${2}"
+  [[ -n "${data}" ]] || read -rd '' data
+  echo -n "${data}" | xxd -r -p | openssl dgst -sha1 -mac hmac -macopt hexkey:"${key}" | cut -d ' ' -f 2
+}
+
+totp "$1"
